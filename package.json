@@ -1,15 +1,16 @@
 {
-  "name": "my-node-app",
-  "version": "1.0.0",
-  "main": "src/index.js",
   "scripts": {
+    "lint": "eslint .",
     "build": "echo 'Building the project...'",
     "test": "jest",
     "generate-docs": "echo 'Generating documentation...'",
-    "deploy": "echo 'Deploying the project...'",
-    "update-docs": "echo 'Updating documentation...'"
+    "deploy": "echo 'Deploying to production...'",
+    "deploy-staging": "echo 'Deploying to staging...'",
+    "integration-test": "echo 'Running integration tests...'",
+    "e2e-test": "echo 'Running end-to-end tests...'"
   },
   "devDependencies": {
-    "jest": "^29.0.0"
+    "jest": "^29.0.0",
+    "eslint": "^7.32.0"
   }
 }
