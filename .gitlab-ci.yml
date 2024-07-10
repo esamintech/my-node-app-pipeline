@@ -3,11 +3,16 @@ image: node:14
 stages:
   - prepare
   - build
-  - test
   - measure
+  - document
+  - test
+  - secure
   - deploy
+  - pages
+  - update_document
 
 variables:
+  TIMESTAMP_FILE: "/artifacts/timestamp.txt"
   SONAR_SCANNER_OPTS: "-Dsonar.projectKey=my-node-app -Dsonar.sources=src -Dsonar.host.url=http://localhost:9000 -Dsonar.login=${SONAR_TOKEN}"
 
 before_script:
@@ -17,42 +22,102 @@ prepare:
   stage: prepare
   script:
     - echo "Preparing the environment..."
-  tags:
-    - shell
-    - local
 
 build:
   stage: build
   script:
-    - echo "Building the project..."
     - npm run build
-  tags:
-    - shell
-    - local
-
-test:
-  stage: test
-  script:
-    - npm test
-  tags:
-    - shell
-    - local
+    - mkdir -p artifacts
+    - date > $TIMESTAMP_FILE
+    - cp $TIMESTAMP_FILE artifacts/
+  artifacts:
+    paths:
+      - artifacts/
+      - public
 
 measure:
   stage: measure
+  needs: ["build"]
   script:
     - apt-get update
     - apt-get install -y openjdk-11-jre
     - npm install -g sonarqube-scanner
     - sonar-scanner
-  tags:
-    - shell
-    - local
+    - TIMESTAMP=$(cat $TIMESTAMP_FILE)
+    - mkdir -p public/report-${TIMESTAMP}/measure
+  artifacts:
+    paths:
+      - public/
+
+document:
+  stage: document
+  needs: ["build"]
+  script:
+    - mkdir -p docs
+    - npm run generate-docs
+    - TIMESTAMP=$(cat $TIMESTAMP_FILE)
+    - mkdir -p public/report-${TIMESTAMP}/document
+    - mv docs/* public/report-${TIMESTAMP}/document/
+  artifacts:
+    paths:
+      - public/
+
+test:
+  stage: test
+  needs: ["build"]
+  script:
+    - export NODE_ENV=test
+    - TIMESTAMP=$(cat $TIMESTAMP_FILE)
+    - mkdir -p public/report-${TIMESTAMP}/tests
+    - jest --outputFile=report.json
+    - npx jest-html-reporter --outputPath=public/report-${TIMESTAMP}/tests/report.html
+  artifacts:
+    paths:
+      - public/
+
+secure:
+  stage: secure
+  needs: ["build"]
+  script:
+    - npm audit --json > audit.json || true
+    - TIMESTAMP=$(cat $TIMESTAMP_FILE)
+    - mkdir -p public/report-${TIMESTAMP}/secure
+    - mv audit.json public/report-${TIMESTAMP}/secure/audit.json
+  artifacts:
+    paths:
+      - public/
 
 deploy:
   stage: deploy
   script:
     - echo "Deploying the project..."
-  tags:
-    - shell
-    - local
+
+pages:
+  stage: pages
+  script:
+    - TIMESTAMP=$(cat $TIMESTAMP_FILE)
+    - mkdir -p public/report-${TIMESTAMP}/measure
+    - mkdir -p public/report-${TIMESTAMP}/document
+    - mkdir -p public/report-${TIMESTAMP}/tests
+    - mkdir -p public/report-${TIMESTAMP}/secure
+    - echo "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/file/public/report-${TIMESTAMP}/measure/pylint-report.html" >> pages/document.txt
+    - echo "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/file/public/report-${TIMESTAMP}/document/app.html" >> pages/document.txt
+    - echo "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/file/public/report-${TIMESTAMP}/tests/report.html" >> pages/document.txt
+    - echo "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/file/public/report-${TIMESTAMP}/secure/audit.json" >> pages/document.txt
+  artifacts:
+    paths:
+      - public
+  when: always
+
+update_document:
+  stage: update_document
+  script:
+    - git checkout main
+    - git pull origin main
+    - cp public/document.txt pages/document.txt
+    - git add pages/document.txt
+    - 'if ! git log -1 --pretty=%B | grep -q "\[ci skip\]"; then git commit -m "Update document.txt with links from pipeline ${CI_PIPELINE_ID} [ci skip]"; git push origin main; fi'
+  only:
+    - main
+  dependencies:
+    - pages
