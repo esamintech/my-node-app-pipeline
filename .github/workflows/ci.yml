@@ -9,6 +9,7 @@ on:
       - main
 
 jobs:
+  # Stage 1: Prepare Environment
   prepare:
     runs-on: ubuntu-latest
     steps:
@@ -23,9 +24,29 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-  build:
+  # Stage 2: Lint Code
+  lint:
     runs-on: ubuntu-latest
     needs: prepare
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: "14"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run ESLint
+        run: npm run lint
+
+  # Stage 3: Build Project
+  build:
+    runs-on: ubuntu-latest
+    needs: lint
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -41,9 +62,29 @@ jobs:
       - name: Build the project
         run: npm run build
 
-  measure:
+  # Stage 4: Run Unit Tests
+  test:
     runs-on: ubuntu-latest
     needs: build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: "14"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test
+
+  # Stage 5: Static Code Analysis
+  measure:
+    runs-on: ubuntu-latest
+    needs: test
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -64,9 +105,10 @@ jobs:
           npm install -g sonarqube-scanner
           sonar-scanner
 
+  # Stage 6: Generate Documentation
   document:
     runs-on: ubuntu-latest
-    needs: build
+    needs: measure
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -88,27 +130,10 @@ jobs:
           name: documentation
           path: docs
 
-  test:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v2
-        with:
-          node-version: "14"
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Run tests
-        run: npm test
-
+  # Stage 7: Security Audit
   secure:
     runs-on: ubuntu-latest
-    needs: test
+    needs: document
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -124,9 +149,51 @@ jobs:
       - name: Run security scan
         run: npm audit
 
-  deploy:
+  # Stage 8: Integration Tests
+  integration-test:
     runs-on: ubuntu-latest
     needs: secure
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: "14"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run integration tests
+        run: npm run integration-test
+
+  # Stage 9: Deploy to Staging
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: integration-test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Deploy to staging
+        run: npm run deploy-staging
+
+  # Stage 10: End-to-End Tests
+  e2e-test:
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Run end-to-end tests
+        run: npm run e2e-test
+
+  # Stage 11: Deploy to Production
+  deploy:
+    runs-on: ubuntu-latest
+    needs: e2e-test
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -134,6 +201,7 @@ jobs:
       - name: Deploy to production
         run: npm run deploy
 
+  # Stage 12: Deploy Documentation to GitHub Pages
   pages:
     runs-on: ubuntu-latest
     needs: document
@@ -144,23 +212,5 @@ jobs:
       - name: Deploy GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          personal_token: ${{ secrets.ACTIONS_PAT }}
           publish_dir: ./docs
-
-  update_document:
-    runs-on: ubuntu-latest
-    needs: deploy
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Update documentation
-        run: npm run update-docs
-
-      - name: Commit and push changes
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
-          git commit -m "Update documentation"
-          git push
