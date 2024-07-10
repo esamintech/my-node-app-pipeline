@@ -3,13 +3,9 @@ image: node:14
 stages:
   - prepare
   - build
-  - measure
-  - document
   - test
-  - secure
+  - measure
   - deploy
-  - pages
-  - update_document
 
 variables:
   SONAR_SCANNER_OPTS: "-Dsonar.projectKey=my-node-app -Dsonar.sources=src -Dsonar.host.url=http://localhost:9000 -Dsonar.login=${SONAR_TOKEN}"
@@ -25,7 +21,13 @@ prepare:
 build:
   stage: build
   script:
+    - echo "Building the project..."
     - npm run build
+
+test:
+  stage: test
+  script:
+    - npm test
 
 measure:
   stage: measure
@@ -35,42 +37,7 @@ measure:
     - npm install -g sonarqube-scanner
     - sonar-scanner
 
-document:
-  stage: document
-  script:
-    - npm run generate-docs
-    - echo "Documentation generated."
-
-test:
-  stage: test
-  script:
-    - npm test
-
-secure:
-  stage: secure
-  script:
-    - npm audit
-
 deploy:
   stage: deploy
   script:
-    - npm run deploy
-
-pages:
-  stage: pages
-  script:
-    - npm run generate-docs
-    - mv docs public
-  artifacts:
-    paths:
-      - public
-
-update_document:
-  stage: update_document
-  script:
-    - npm run update-docs
-    - git config --global user.name "gitlab-ci"
-    - git config --global user.email "gitlab-ci@example.com"
-    - git add .
-    - git commit -m "Update documentation"
-    - git push
+    - echo "Deploying the project..."
