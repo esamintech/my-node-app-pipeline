@@ -17,17 +17,26 @@ prepare:
   stage: prepare
   script:
     - echo "Preparing the environment..."
+  tags:
+    - shell
+    - local
 
 build:
   stage: build
   script:
     - echo "Building the project..."
     - npm run build
+  tags:
+    - shell
+    - local
 
 test:
   stage: test
   script:
     - npm test
+  tags:
+    - shell
+    - local
 
 measure:
   stage: measure
@@ -36,8 +45,14 @@ measure:
     - apt-get install -y openjdk-11-jre
     - npm install -g sonarqube-scanner
     - sonar-scanner
+  tags:
+    - shell
+    - local
 
 deploy:
   stage: deploy
   script:
     - echo "Deploying the project..."
+  tags:
+    - shell
+    - local
