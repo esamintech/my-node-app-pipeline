@@ -146,23 +146,3 @@ jobs:
         with:
           personal_token: ${{ secrets.ACTIONS_PAT }}
           publish_dir: ./docs
-
-  update_document:
-    runs-on: ubuntu-latest
-    needs: deploy
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Update documentation
-        run: npm run update-docs
-
-      - name: Commit and push changes
-        env:
-          GITHUB_TOKEN: ${{ secrets.ACTIONS_PAT }}
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
-          git diff-index --quiet HEAD || git commit -m "Update document.txt with links from pipeline ${CI_PIPELINE_ID} [ci skip]"
-          git push
